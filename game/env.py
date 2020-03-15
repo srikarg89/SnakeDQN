@@ -22,7 +22,7 @@ class Environment:
 
     def end_game(self):
         self.display.terminate()
-        self.snake.terminate()
+        self.snake.terminate(self)
         self.game_over = True
 
 
@@ -39,6 +39,7 @@ class Environment:
 
 
     def update(self):
+#        print("Running")
         action = self.snake.act(self)
         if action is None:
             self.end_game()
@@ -59,6 +60,7 @@ class Environment:
 
 
     def run(self):
+#        print("Beginning game")
         while not self.game_over:
             self.update()
             self.display.render()

@@ -16,5 +16,4 @@ def opp(dir):
 
 def gen_random_loc():
     width, height = constants.BOARD_WIDTH, constants.BOARD_HEIGHT
-    print(width, height)
     return (random.randint(1, width - 2), random.randint(1, height - 2))

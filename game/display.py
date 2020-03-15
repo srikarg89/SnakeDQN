@@ -47,13 +47,7 @@ class Display:
 
 class NoDisplay:
 
-    def draw_block(self):
-        pass
-    
-    def draw_wall(self):
-        pass
-    
-    def draw(self):
+    def draw(self, snake, apple):
         pass
     
     def render(self):

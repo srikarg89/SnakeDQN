@@ -15,8 +15,11 @@ class AI(Snake):
         self.directions = [constants.NORTH, constants.SOUTH, constants.EAST, constants.SOUTH]
 
         # DQNs
+        print("Creating nets")
         self.train_brain = Brain(800, 4)
+        print("Created training net")
         self.target_brain = Brain(800, 4)
+        print("Created target net")
 
         # Hyperparameters
         self.epsilon = 1.00
@@ -50,7 +53,7 @@ class AI(Snake):
     def act(self, env):
         # Calculate stuff
         state = self.get_state(env)
-        idx = train_brain.get_action(state, self.epsilon)
+        idx = self.train_brain.get_action(state, self.epsilon)
         # Save variables to add to experience replay later
         self.state = state
         self.action = idx
@@ -60,7 +63,7 @@ class AI(Snake):
 
     def learn(self, exp):
         self.train_brain.add_experience(exp)
-        self.train_brain.train(self.target_brain)
+        self.train_brain.learn(self.target_brain)
         if self.counter % constants.COPY_STEP == 0:
             self.target_brain.copy_weights(self.train_brain)
 
@@ -73,20 +76,21 @@ class AI(Snake):
         self.learn([state, action, reward, new_state, done])
 
 
-    def terminate(self):
+    def terminate(self, env):
         # Save experience
         state, action = self.state, self.action
         reward = -20
-        next_state = self.get_state()
+        next_state = self.get_state(env)
         done = True
         self.learn([state, action, reward, next_state, done])
 
         # Log stuff
-        game_reward = self.length - 3 - 20
+        game_reward = len(self.body) + 1 - constants.SNAKE_INIT_LENGTH - 20
         self.rewards.append(game_reward)
         if len(self.rewards) == 100:
             self.rewards.popleft()
-        print("Length:", len(self.body) + 1)
+        if self.game_num % 100 == 0:
+            print("Game: {}, Length: {}".format(self.game_num, len(self.body) + 1))
         self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
         with self.summary_writer.as_default():
             tf.summary.scalar('episode reward', game_reward, step=self.game_num)
@@ -145,7 +149,7 @@ class Brain:
 
     def add_experience(self, exp):
         self.experiences.append(exp)
-        if len(self.experineces) > self.max_experiences:
+        if len(self.experiences) > self.max_experiences:
             self.experiences.popleft()
     
 
@@ -174,9 +178,9 @@ class Model(tf.keras.Model):
     @tf.function
     def call(self, inputs):
         output = self.input_layer(inputs)
-        for layer in hidden_layers:
+        for layer in self.hidden_layers:
             output = layer(output)
-        output = self.output_layers(output)
+        output = self.output_layer(output)
         return output
         
 
