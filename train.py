@@ -1,5 +1,5 @@
 #https://towardsdatascience.com/deep-reinforcement-learning-build-a-deep-q-network-dqn-to-play-cartpole-with-tensorflow-2-and-gym-8e105744b998
-from players.ai import AI
+from players.ai_single import AI
 from game.env import Environment
 from game.display import Display, NoDisplay
 

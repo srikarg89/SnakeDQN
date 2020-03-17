@@ -29,9 +29,9 @@ class Environment:
         return loc
         
 
-    def end_game(self):
+    def end_game(self, state, action):
         self.display.terminate()
-        self.snake.terminate(self)
+        self.snake.terminate(state, action)
         self.game_over = True
 
 
@@ -49,28 +49,30 @@ class Environment:
 
     def update(self):
 #        print("Running")
-        self.timer += 1
-        if self.timer >= self.timer_threshold:
-            self.end_game()
+        state = self.snake.get_state(self)
+        action, direction = self.snake.act(self)
+        if direction is None:
+            self.end_game(state, action)
             return
-
-        action = self.snake.act(self)
-        if action is None:
-            self.end_game()
-            return
-        self.snake.direction = action
+        self.snake.direction = direction
         
         eaten = self.check_eaten()
         if eaten:
             self.apple = self.generate_apple()
             self.timer = 0
         self.snake.move(eaten)
+        next_state = self.snake.get_state(self)
 
         if self.check_collision():
-            self.end_game()
+            self.end_game(state, action)
             return
 
-        self.snake.save(self)
+        self.timer += 1
+        if self.timer >= self.timer_threshold:
+            self.end_game(state, action)
+            return
+
+        self.snake.save(state, action, eaten, next_state)
         self.display.draw(self.snake, self.apple)
 
 

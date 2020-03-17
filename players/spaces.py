@@ -62,7 +62,7 @@ class FPVSpace:
     @staticmethod
     def get_action(snake, state):
         # Calculate stuff
-        idx = snake.train_brain.get_action(state, snake.epsilon)
+        idx = snake.brain.get_action(state)
         # Save variables to add to experience replay later
         return idx
     
@@ -74,4 +74,3 @@ class FPVSpace:
             return snake.direction
         if idx == 2:
             return rotate_counter_clockwise(rotate_counter_clockwise(snake.direction))
-
