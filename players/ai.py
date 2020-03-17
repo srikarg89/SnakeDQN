@@ -28,8 +28,6 @@ class AI(Snake):
         self.espilon_decay = constants.EPSILON_DECAY
 
         # Saving
-        self.state = None
-        self.action = None
         self.counter = 0
         self.rewards = deque([])
         self.game_num = 0
@@ -47,7 +45,8 @@ class AI(Snake):
 
 
     def act(self, env):
-        self.action = Space.get_action(self, env)
+        state = self.get_state(env)
+        self.action = Space.get_action(self, state)
         return Space.interpret(self, self.action)
 
 
@@ -81,10 +80,11 @@ class AI(Snake):
         # Log stuff
         game_reward = len(self.body) + 1 - constants.SNAKE_INIT_LENGTH - 20
         self.rewards.append(game_reward)
-        if len(self.rewards) == 100:
+        if len(self.rewards) == 50:
             self.rewards.popleft()
-        if self.game_num % 100 == 0:
-            print("Game: {}, Length: {}".format(self.game_num, self.running_length / 100.0))
+        if self.game_num % 50 == 0:
+            print("Game: {}, Length: {}".format(self.game_num, self.running_length / 50.0))
+            print(self.epsilon)
             self.running_length = 0.0
         self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
         with self.summary_writer.as_default():
@@ -111,7 +111,7 @@ class Brain:
 
     def predict(self, input):
         #FIXME: wtf it doesn't care what the input shape is? nani?
-        print("Predicting:", input.shape)
+#        print("Predicting:", input.shape)
         return self.model(np.atleast_2d(input.astype('float32')))
 
 
@@ -119,7 +119,7 @@ class Brain:
     def train(self, target):
         if len(self.experiences) < self.min_experiences:
             return
-        print("Training")
+#        print("Training")
 
         idxs = np.random.randint(low=0, high=len(self.experiences), size=self.batch_size)
         experiences = [self.experiences[i] for i in idxs]
@@ -131,7 +131,6 @@ class Brain:
         actual_values = np.where(dones, rewards, rewards + self.gamma*next_values)
 
         with tf.GradientTape() as tape:
-            print(type(states[0]), states[0].shape, states.shape)
             selected_action_values = tf.math.reduce_sum(
                 self.predict(states) * tf.one_hot(actions, self.num_outputs), axis=1)
             loss = tf.math.reduce_sum(tf.square(actual_values - selected_action_values))

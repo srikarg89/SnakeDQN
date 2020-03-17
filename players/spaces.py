@@ -21,9 +21,8 @@ class BoardSpace:
 
 
     @staticmethod
-    def get_action(snake, env):
+    def get_action(snake, state):
         # Calculate stuff
-        state = BoardSpace.get_state(snake, env)
         idx = snake.train_brain.get_action(state, snake.epsilon)
         # Save variables to add to experience replay later
         return idx
@@ -61,9 +60,8 @@ class FPVSpace:
 
 
     @staticmethod
-    def get_action(snake, env):
+    def get_action(snake, state):
         # Calculate stuff
-        state = FPVSpace.get_state(snake, env)
         idx = snake.train_brain.get_action(state, snake.epsilon)
         # Save variables to add to experience replay later
         return idx
