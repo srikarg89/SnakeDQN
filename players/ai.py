@@ -4,21 +4,22 @@ import numpy as np
 import tensorflow as tf
 from game.helpers import opp
 from collections import deque
+from players.models.basic import Model
 from players.snake import Snake
 import game.constants as constants
+from players.spaces import FPVSpace as Space
 
 class AI(Snake):
 
     def __init__(self):
         super().__init__()
-        self.board_width, self.board_height = constants.BOARD_WIDTH, constants.BOARD_HEIGHT
         self.directions = [constants.NORTH, constants.SOUTH, constants.EAST, constants.SOUTH]
 
         # DQNs
         print("Creating nets")
-        self.train_brain = Brain(800, 4)
+        self.train_brain = Brain(Space.STATE_SIZE, Space.ACTION_SIZE)
         print("Created training net")
-        self.target_brain = Brain(800, 4)
+        self.target_brain = Brain(Space.STATE_SIZE, Space.ACTION_SIZE)
         print("Created target net")
 
         # Hyperparameters
@@ -37,52 +38,45 @@ class AI(Snake):
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         log_dir = 'logs/dqn/' + current_time
         self.summary_writer = tf.summary.create_file_writer(log_dir)
+        self.running_length = 0.0
 
 
     def get_state(self, env):
-        arr1, arr2 = [], []
-        for i in range(self.board_height):
-            for j in range(self.board_width):
-                a = 1 if (i,j) == env.apple else 0
-                s = 1 if (i,j) in [self.head] + self.body else 0
-                arr1.append(s)
-                arr2.append(a)
-        return np.array(arr1 + arr2)
+        self.state = Space.get_state(self, env)
+        return self.state
 
 
     def act(self, env):
-        # Calculate stuff
-        state = self.get_state(env)
-        idx = self.train_brain.get_action(state, self.epsilon)
-        # Save variables to add to experience replay later
-        self.state = state
-        self.action = idx
+        self.action = Space.get_action(self, env)
+        return Space.interpret(self, self.action)
 
-        return self.directions[idx]
-    
 
-    def learn(self, exp):
+    def train(self, exp):
         self.train_brain.add_experience(exp)
-        self.train_brain.learn(self.target_brain)
+        self.train_brain.train(self.target_brain)
         if self.counter % constants.COPY_STEP == 0:
             self.target_brain.copy_weights(self.train_brain)
 
 
     def save(self, env):
-        state, action = self.state, self.action
+        state = np.copy(self.state)
+        action = self.action
+#        print("SAVING: ", state.shape)
         reward = 1 if self.ate else 0
         new_state = self.get_state(env)
         done = False
-        self.learn([state, action, reward, new_state, done])
+        self.train([state, action, reward, new_state, done])
 
 
     def terminate(self, env):
+        self.running_length += len(self.body) + 1
         # Save experience
-        state, action = self.state, self.action
+        state = np.copy(self.state)
+        action = self.action
         reward = -20
         next_state = self.get_state(env)
         done = True
-        self.learn([state, action, reward, next_state, done])
+        self.train([state, action, reward, next_state, done])
 
         # Log stuff
         game_reward = len(self.body) + 1 - constants.SNAKE_INIT_LENGTH - 20
@@ -90,7 +84,8 @@ class AI(Snake):
         if len(self.rewards) == 100:
             self.rewards.popleft()
         if self.game_num % 100 == 0:
-            print("Game: {}, Length: {}".format(self.game_num, len(self.body) + 1))
+            print("Game: {}, Length: {}".format(self.game_num, self.running_length / 100.0))
+            self.running_length = 0.0
         self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
         with self.summary_writer.as_default():
             tf.summary.scalar('episode reward', game_reward, step=self.game_num)
@@ -115,24 +110,28 @@ class Brain:
 
 
     def predict(self, input):
+        #FIXME: wtf it doesn't care what the input shape is? nani?
+        print("Predicting:", input.shape)
         return self.model(np.atleast_2d(input.astype('float32')))
 
 
-    @tf.function
-    def learn(self, target):
+#    @tf.function
+    def train(self, target):
         if len(self.experiences) < self.min_experiences:
             return
-        
+        print("Training")
+
         idxs = np.random.randint(low=0, high=len(self.experiences), size=self.batch_size)
         experiences = [self.experiences[i] for i in idxs]
         temp = []
         for i in range(5):
-            temp.append(np.asarray([experiences[j][i] for j in experiences]))
+            temp.append(np.asarray([exp[i] for exp in experiences]))
         states, actions, rewards, next_states, dones = temp
         next_values = np.max(target.predict(next_states), axis=1)
         actual_values = np.where(dones, rewards, rewards + self.gamma*next_values)
 
         with tf.GradientTape() as tape:
+            print(type(states[0]), states[0].shape, states.shape)
             selected_action_values = tf.math.reduce_sum(
                 self.predict(states) * tf.one_hot(actions, self.num_outputs), axis=1)
             loss = tf.math.reduce_sum(tf.square(actual_values - selected_action_values))
@@ -157,30 +156,7 @@ class Brain:
         variables1 = self.model.trainable_variables
         variables2 = train.model.trainable_variables
         for v1, v2 in zip(variables1, variables2):
-            v1.assing(v2.numpy())
+            v1.assign(v2.numpy())
 
 
-
-class Model(tf.keras.Model):
-
-    def __init__(self, num_inputs, hidden_units, num_outputs):
-        super(Model, self).__init__()
-        self.input_layer = tf.keras.layers.InputLayer(input_shape = (num_inputs, ))
-        self.hidden_layers = []
-        for i in hidden_units:
-            self.hidden_layers.append(tf.keras.layers.Dense(
-                i, activation='tanh', kernel_initializer='RandomNormal'
-            ))
-        self.output_layer = tf.keras.layers.Dense(
-            num_outputs, activation='linear', kernel_initializer='RandomNormal'
-        )
-
-    @tf.function
-    def call(self, inputs):
-        output = self.input_layer(inputs)
-        for layer in self.hidden_layers:
-            output = layer(output)
-        output = self.output_layer(output)
-        return output
-        
 

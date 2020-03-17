@@ -10,6 +10,15 @@ class Environment:
         self.apple = self.generate_apple()
         self.display = display
         self.game_over = False
+        self.wall = []
+        self.timer = 0
+        self.timer_threshold = constants.APPLE_TIMER
+        for i in range(self.board_width):
+            self.wall.append((i, 0))
+            self.wall.append((i, self.board_height - 1))
+        for i in range(self.board_height):
+            self.wall.append((0, i))
+            self.wall.append((self.board_width - 1, i))
     
 
     def generate_apple(self):
@@ -40,6 +49,11 @@ class Environment:
 
     def update(self):
 #        print("Running")
+        self.timer += 1
+        if self.timer >= self.timer_threshold:
+            self.end_game()
+            return
+
         action = self.snake.act(self)
         if action is None:
             self.end_game()
@@ -49,6 +63,7 @@ class Environment:
         eaten = self.check_eaten()
         if eaten:
             self.apple = self.generate_apple()
+            self.timer = 0
         self.snake.move(eaten)
 
         if self.check_collision():
@@ -60,6 +75,7 @@ class Environment:
 
 
     def run(self):
+        self.snake.reset()
 #        print("Beginning game")
         while not self.game_over:
             self.update()

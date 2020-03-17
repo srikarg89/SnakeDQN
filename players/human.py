@@ -20,6 +20,9 @@ class Human(Snake):
                     return constants.SOUTH
 
         return self.direction
+    
+    def save(self, env):
+        pass
 
-    def terminate(self):
+    def terminate(self, env):
         print("Length:", len(self.body) + 1)

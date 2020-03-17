@@ -1,5 +1,5 @@
 from game.env import Environment
-from players.ai import AI as Snake
+from players.human import Human as Snake
 from game.display import Display
 
 test = Environment(Snake(), Display())
