@@ -72,7 +72,7 @@ class Environment:
             return
 
         next_state = self.snake.get_state(self)
-        self.snake.save(state, action, eaten, next_state)
+        self.snake.remember(state, action, eaten, next_state)
         self.display.draw(self.snake, self.apple)
 
 

@@ -1,7 +1,10 @@
 import tensorflow as tf
 
 
-def Model(num_inputs, hidden_units, num_outputs):
+def Model(num_inputs, hidden_units, num_outputs, filename):
+    return build(num_inputs, hidden_units, num_outputs)
+
+def build(num_inputs, hidden_units, num_outputs):
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.InputLayer(input_shape = (num_inputs, )))
     for i in hidden_units:
@@ -11,7 +14,12 @@ def Model(num_inputs, hidden_units, num_outputs):
     model.add(tf.keras.layers.Dense(
         num_outputs, activation='linear', kernel_initializer='RandomNormal'
     ))
+    model.summary()
     return model
+
+
+def load(filename):
+    return tf.keras.models.load_model(filename)
 
 
 """

@@ -5,8 +5,7 @@ from game.display import Display, NoDisplay
 
 snake = AI()
 
-gottem = 0
-for i in range(10000):
+for i in range(100):
     display = NoDisplay()
     validate = False
     if i % 50 == 0:
@@ -16,16 +15,7 @@ for i in range(10000):
     env = Environment(snake, display)
     env.run(validate)
 #    print(1/0)
-#    if len(env.snake.body) != 3:
-#        gottem += 1
 
-print("Gottem: ", gottem)
 print("Final epsilon:", snake.epsilon)
 
-# serialize model to JSON
-#model_json = snake.train_brain.model.to_json()
-#with open("models/first.json", "w") as json_file:
-#    json_file.write(model_json)
-# serialize weights to HDF5
-#snake.train_brain.model.save_weights("models/first.h5")
-#print("Saved model to disk")
+snake.save_model('first.h5')

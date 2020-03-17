@@ -11,13 +11,13 @@ from players.spaces import FPVSpace as Space
 
 class AI(Snake):
 
-    def __init__(self):
+    def __init__(self, filename=None):
         super().__init__()
         self.directions = [constants.NORTH, constants.SOUTH, constants.EAST, constants.SOUTH]
 
         # DQNs
         print("Creating nets")
-        self.brain = Brain(Space.STATE_SIZE, Space.ACTION_SIZE)
+        self.brain = Brain(Space.STATE_SIZE, Space.ACTION_SIZE, filename)
 
         # Hyperparameters
         self.epsilon = 1.00
@@ -49,16 +49,19 @@ class AI(Snake):
         return action, Space.interpret(self, action)
 
 
-    def save(self, state, action, ate, next_state):
-#        print("SAVING: ", state.shape)
+    def remember(self, state, action, ate, next_state):
         reward = -1 if next_state is None else 1 if ate else 0
         self.brain.add_experience([state, action, reward, next_state])
         loss = self.brain.replay()
 
 
+    def save_model(self, filename):
+        self.brain.model.save('models/' + filename)
+
+
     def terminate(self, state, action, validate):
         self.running_length += len(self.body) + 1
-        self.save(state, action, False, None)
+        self.remember(state, action, False, None)
         loss = self.brain.replay()
         self.running_loss += loss
 
@@ -85,7 +88,7 @@ class AI(Snake):
 
 class Brain:
 
-    def __init__(self, num_inputs, num_outputs):
+    def __init__(self, num_inputs, num_outputs, filename):
         # Model generation
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
@@ -93,7 +96,7 @@ class Brain:
         self.gamma = constants.GAMMA
         self.optimizer = tf.optimizers.Adam(self.learning_rate)
         self.loss = tf.keras.losses.MeanSquaredError()
-        self.model = Model(num_inputs, constants.HIDDEN, num_outputs)
+        self.model = Model(num_inputs, constants.HIDDEN, num_outputs, filename)
         self.experiences = deque([])
         self.max_experiences = constants.MAX_EXPERIENCES
         self.min_experiences = constants.MIN_EXPERIENCES
