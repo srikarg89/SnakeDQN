@@ -41,9 +41,8 @@ class AI(Snake):
         return Space.get_state(self, env)
 
 
-    def act(self, env):
-        state = self.get_state(env)
-        if np.random.random() < self.epsilon:
+    def act(self, state, validate):
+        if np.random.random() < self.epsilon and not validate:
             action = np.random.choice(Space.ACTION_SIZE)
         else:
             action = Space.get_action(self, state)
@@ -52,21 +51,22 @@ class AI(Snake):
 
     def save(self, state, action, ate, next_state):
 #        print("SAVING: ", state.shape)
-        reward = -20 if next_state is None else 1 if ate else 0
+        reward = -1 if next_state is None else 1 if ate else 0
         self.brain.add_experience([state, action, reward, next_state])
         loss = self.brain.replay()
-        self.running_loss += loss
 
 
-    def terminate(self, state, action):
+    def terminate(self, state, action, validate):
         self.running_length += len(self.body) + 1
         self.save(state, action, False, None)
+        loss = self.brain.replay()
+        self.running_loss += loss
 
         # Log stuff
         game_reward = len(self.body) + 1 - constants.SNAKE_INIT_LENGTH - 20
         self.rewards.append(game_reward)
         display_interval = 50.0
-        if len(self.rewards) == display_interval:
+        if len(self.rewards) >= display_interval:
             self.rewards.popleft()
         if self.game_num % 50 == 0:
             print("Game: {}, Length: {}".format(self.game_num, self.running_length / display_interval))
@@ -74,6 +74,8 @@ class AI(Snake):
             print("Loss: {}".format(self.running_loss / display_interval))
             self.running_length = 0.0
             self.running_loss = 0.0
+        if validate:
+            print("Game: {}, Length: {}".format(self.game_num, len(self.body) + 1))
         self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
         with self.summary_writer.as_default():
             tf.summary.scalar('episode reward', game_reward, step=self.game_num)
@@ -108,8 +110,6 @@ class Brain:
     def replay(self):
         if len(self.experiences) < self.min_experiences:
             return -100000
-#        print("Training")
-
         # Sample from experience
         idxs = np.random.randint(low=0, high=len(self.experiences), size=self.batch_size)
         batch = [self.experiences[i] for i in idxs]
@@ -117,8 +117,7 @@ class Brain:
         next_states = np.array([exp[3] if exp[3] is not None else np.zeros((self.num_inputs, )) for exp in batch])
         q_s_a = self.model.predict_on_batch(states)
         q_s_a_d = self.model.predict_on_batch(next_states)
-
-        # setup training arrays
+        # Setup training arrays
         x = np.zeros((len(batch), self.num_inputs))
         y = np.zeros((len(batch), self.num_outputs))
         for i, b in enumerate(batch):

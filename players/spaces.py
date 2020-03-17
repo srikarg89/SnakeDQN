@@ -1,5 +1,5 @@
 import numpy as np
-from game.helpers import add, sub, rotate_clockwise, rotate_counter_clockwise
+from game.helpers import add, sub, rotate_clockwise, rotate_counter_clockwise, angle
 
 class BoardSpace:
 
@@ -42,20 +42,28 @@ class FPVSpace:
         head = snake.head
         arr = []
         block_groups = [snake.body, [env.apple], env.wall]
-        for group in block_groups:
+        for xd, group in enumerate(block_groups):
             dir = snake.direction
             temp = []
             for i in range(8):
                 val = 0.0
                 for b in group:
-                    d = sub(head, b)
-                    if d[0] != d[1] or d[0] < 0:
+                    d = sub(b, head)
+                    if d[0] == 0 and d[1] == 0:
+                        val = 1
+                        break
+#                    if xd == 0 and i == 3:
+#                        print(d)
+                    if angle(dir) != angle(d):
                         continue
-                    val = 1.0 / d[0] if d[0] != 0 else 1
+                    val = abs(1.0 / d[0] if d[0] != 0 else 1.0 / d[1])
+                    break
                 dir = rotate_clockwise(dir)
                 temp.append(val)
             arr.extend(temp)
         arr.append(env.timer / env.timer_threshold)
+#        print("ARRAY")
+#        print(arr)
         return np.array(arr)
 
 

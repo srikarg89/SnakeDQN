@@ -10,10 +10,13 @@ def mult(a, s):
     return (a[0] * s, a[1] * s)
 
 def sub(a, b):
-    return (b[0] - a[0], b[1] - a[1])
+    return (a[0] - b[0], a[1] - b[1])
 
 def dist(a, b):
     return math.abs(a[0] - b[0]) + math.abs(a[1] - b[1])
+
+def angle(a):
+    return math.atan2(a[1], a[0])
 
 def opp(dir):
     return (-dir[0], -dir[1])

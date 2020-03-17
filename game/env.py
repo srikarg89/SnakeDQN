@@ -1,5 +1,5 @@
 import game.constants as constants
-from game.helpers import gen_random_loc
+from game.helpers import gen_random_loc, add
 
 class Environment:
 
@@ -29,9 +29,9 @@ class Environment:
         return loc
         
 
-    def end_game(self, state, action):
+    def end_game(self, state, action, validate):
         self.display.terminate()
-        self.snake.terminate(state, action)
+        self.snake.terminate(state, action, validate)
         self.game_over = True
 
 
@@ -44,15 +44,15 @@ class Environment:
 
 
     def check_eaten(self):
-        return self.snake.head == self.apple
+        return add(self.snake.head, self.snake.direction) == self.apple
 
 
-    def update(self):
+    def update(self, validate):
 #        print("Running")
         state = self.snake.get_state(self)
-        action, direction = self.snake.act(self)
+        action, direction = self.snake.act(state, validate)
         if direction is None:
-            self.end_game(state, action)
+            self.end_game(state, action, validate)
             return
         self.snake.direction = direction
         
@@ -61,24 +61,24 @@ class Environment:
             self.apple = self.generate_apple()
             self.timer = 0
         self.snake.move(eaten)
-        next_state = self.snake.get_state(self)
 
         if self.check_collision():
-            self.end_game(state, action)
+            self.end_game(state, action, validate)
             return
 
         self.timer += 1
         if self.timer >= self.timer_threshold:
-            self.end_game(state, action)
+            self.end_game(state, action, validate)
             return
 
+        next_state = self.snake.get_state(self)
         self.snake.save(state, action, eaten, next_state)
         self.display.draw(self.snake, self.apple)
 
 
-    def run(self):
+    def run(self, validate):
         self.snake.reset()
 #        print("Beginning game")
         while not self.game_over:
-            self.update()
+            self.update(validate)
             self.display.render()

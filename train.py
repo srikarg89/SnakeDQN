@@ -8,11 +8,14 @@ snake = AI()
 gottem = 0
 for i in range(10000):
     display = NoDisplay()
-#    if i % 500 == 0:
-#        print("Displaying: ", i)
-#        display = Display()
+    validate = False
+    if i % 50 == 0:
+        print("Displaying: ", i)
+        display = Display()
+        validate = True
     env = Environment(snake, display)
-    env.run()
+    env.run(validate)
+#    print(1/0)
 #    if len(env.snake.body) != 3:
 #        gottem += 1
 
