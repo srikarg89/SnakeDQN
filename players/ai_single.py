@@ -75,7 +75,7 @@ class AI(Snake):
             self.running_length = 0.0
             self.running_loss = 0.0
         if validate:
-            print("Game: {}, Length: {}".format(self.game_num, len(self.body) + 1))
+            print("Validation Game: {}, Length: {}".format(self.game_num, len(self.body) + 1))
         self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
         with self.summary_writer.as_default():
             tf.summary.scalar('episode reward', game_reward, step=self.game_num)
