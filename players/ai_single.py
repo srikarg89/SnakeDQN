@@ -9,6 +9,8 @@ from players.snake import Snake
 import game.constants as constants
 from players.spaces import FPVSpace as Space
 
+
+
 class AI(Snake):
 
     def __init__(self, filename=None):
@@ -137,8 +139,8 @@ class Brain:
             x[i] = state
             y[i] = current_q
 
-        output = self.model.train_on_batch(x, y)
-        return output
+        loss = self.model.train_on_batch(x, y)
+        return loss
 
 
     def get_action(self, state):
