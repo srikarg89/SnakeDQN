@@ -62,9 +62,8 @@ class FPVSpace:
                 temp.append(val)
             arr.extend(temp)
         arr.append(env.timer / env.timer_threshold)
-#        print("ARRAY")
-#        print(arr)
-        return np.array(arr)
+        return np.reshape(np.array(arr), (1, len(arr)))
+#        return np.array([np.array(arr)])
 
 
     @staticmethod

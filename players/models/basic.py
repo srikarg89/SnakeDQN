@@ -2,6 +2,8 @@ import tensorflow as tf
 
 
 def Model(num_inputs, hidden_units, num_outputs, filename):
+    if filename:
+        return load(filename)
     return build(num_inputs, hidden_units, num_outputs)
 
 def build(num_inputs, hidden_units, num_outputs):
@@ -19,7 +21,7 @@ def build(num_inputs, hidden_units, num_outputs):
 
 
 def load(filename):
-    return tf.keras.models.load_model(filename)
+    return tf.keras.models.load_model("models/" + filename)
 
 
 """

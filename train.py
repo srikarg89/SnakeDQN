@@ -5,16 +5,15 @@ from game.display import Display, NoDisplay
 
 snake = AI()
 
-for i in range(2000):
+for i in range(100):
     display = NoDisplay()
     validate = False
-    if i % 50 == 0:
+    if i % 10 == 0:
         print("Displaying: ", i)
         display = Display()
         validate = True
     env = Environment(snake, display)
     env.run(validate)
-#    print(1/0)
 
 print("Final epsilon:", snake.epsilon)
 

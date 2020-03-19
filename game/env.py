@@ -72,7 +72,9 @@ class Environment:
             return
 
         next_state = self.snake.get_state(self)
-        self.snake.remember(state, action, eaten, next_state)
+        if not validate:
+            self.snake.remember(state, action, eaten, next_state)
+            self.snake.replay()
         self.display.draw(self.snake, self.apple)
 
 

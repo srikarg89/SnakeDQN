@@ -54,7 +54,12 @@ class AI(Snake):
     def remember(self, state, action, ate, next_state):
         reward = -1 if next_state is None else 1 if ate else 0
         self.brain.add_experience([state, action, reward, next_state])
+    
+
+    def replay(self):
         loss = self.brain.replay()
+        self.running_loss += loss
+        self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
 
 
     def save_model(self, filename):
@@ -63,9 +68,9 @@ class AI(Snake):
 
     def terminate(self, state, action, validate):
         self.running_length += len(self.body) + 1
-        self.remember(state, action, False, None)
-        loss = self.brain.replay()
-        self.running_loss += loss
+        if not validate:
+            self.remember(state, action, False, None)
+            self.replay()
 
         # Log stuff
         game_reward = len(self.body) + 1 - constants.SNAKE_INIT_LENGTH - 20
@@ -73,15 +78,15 @@ class AI(Snake):
         display_interval = 50.0
         if len(self.rewards) >= display_interval:
             self.rewards.popleft()
-        if self.game_num % 50 == 0:
+        if self.game_num % 1 == 0:
             print("Game: {}, Length: {}".format(self.game_num, self.running_length / display_interval))
             print("Epsilon: {}".format(self.epsilon))
             print("Loss: {}".format(self.running_loss / display_interval))
             self.running_length = 0.0
             self.running_loss = 0.0
-        if validate:
-            print("Validation Game: {}, Length: {}".format(self.game_num, len(self.body) + 1))
-        self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
+        toprint = "Validation " if validate else ""
+        print(toprint + "Game: {}, Length: {}".format(self.game_num, len(self.body) + 1))
+#        self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
         with self.summary_writer.as_default():
             tf.summary.scalar('episode reward', game_reward, step=self.game_num)
             tf.summary.scalar('running avg reward(100)', sum(self.rewards) / len(self.rewards), step=self.game_num)
@@ -99,48 +104,50 @@ class Brain:
         self.optimizer = tf.optimizers.Adam(self.learning_rate)
         self.loss = tf.keras.losses.MeanSquaredError()
         self.model = Model(num_inputs, constants.HIDDEN, num_outputs, filename)
-        self.experiences = deque([])
         self.max_experiences = constants.MAX_EXPERIENCES
         self.min_experiences = constants.MIN_EXPERIENCES
+        self.experiences = deque([], maxlen=self.max_experiences)
         self.batch_size = constants.BATCH_SIZE
         self.model.compile(self.optimizer, self.loss)
 
 
     def predict(self, input):
         assert(type(input) == np.ndarray)
-        reshaped = np.array([input])
-        return self.model.predict(reshaped)
+        return self.model.predict(input)
 
 
     def replay(self):
         if len(self.experiences) < self.min_experiences:
             return -100000
         # Sample from experience
-        idxs = np.random.randint(low=0, high=len(self.experiences), size=self.batch_size)
-        batch = [self.experiences[i] for i in idxs]
-        states = np.array([exp[0] for exp in batch])
-        next_states = np.array([exp[3] if exp[3] is not None else np.zeros((self.num_inputs, )) for exp in batch])
-        q_s_a = self.model.predict_on_batch(states)
-        q_s_a_d = self.model.predict_on_batch(next_states)
+        batch = random.sample(self.experiences, self.batch_size)
+#        states = np.array([exp[0] for exp in batch])
+#        next_states = np.array([exp[3] if exp[3] is not None else np.zeros((self.num_inputs, )) for exp in batch])
+#        q_s_a = self.model.predict_on_batch(states)
+#        q_s_a_d = self.model.predict_on_batch(next_states)
         # Setup training arrays
-        x = np.zeros((len(batch), self.num_inputs))
-        y = np.zeros((len(batch), self.num_outputs))
+        loss = 0
         for i, b in enumerate(batch):
             state, action, reward, next_state = b[0], b[1], b[2], b[3]
             # get the current q values for all actions in state
-            current_q = q_s_a[i].numpy()
+#            current_q = q_s_a[i]
+            current_q = self.predict(state)
             # update the q value for action
             if next_state is None:
                 # in this case, the game completed after action, so there is no max Q(s',a')
                 # prediction possible
-                current_q[action] = reward
+                current_q[0][action] = reward
             else:
-                current_q[action] = reward + self.gamma * np.amax(q_s_a_d[i])
-            x[i] = state
-            y[i] = current_q
+#                current_q[0][action] = reward + self.gamma * np.amax(q_s_a_d[i][0])
+                next_q = self.predict(next_state)
+                current_q[0][action] = reward + self.gamma * np.amax(next_q[0])
+#            x[i] = state
+#            y[i] = current_q
+            history = self.model.fit(state, current_q, verbose=False)
+            loss += history.history['loss'][0]
 
-        loss = self.model.train_on_batch(x, y)
-        return loss
+#        loss = self.model.train_on_batch(x, y)
+        return loss / self.batch_size
 
 
     def get_action(self, state):
@@ -150,7 +157,5 @@ class Brain:
 
     def add_experience(self, exp):
         self.experiences.append(exp)
-        if len(self.experiences) > self.max_experiences:
-            self.experiences.popleft()
-    
+   
 

@@ -41,7 +41,9 @@ class Display:
 
 
     def terminate(self):
-        pygame.quit()
+        pygame.display.quit()
+#        pygame.quit()
+#        print("Ended pygame")
 
 
 
