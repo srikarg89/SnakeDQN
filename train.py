@@ -5,7 +5,7 @@ from game.display import Display, NoDisplay
 
 snake = AI()
 
-for i in range(100):
+for i in range(2000):
     display = NoDisplay()
     validate = False
     if i % 10 == 0:
@@ -17,4 +17,4 @@ for i in range(100):
 
 print("Final epsilon:", snake.epsilon)
 
-snake.save_model('first.h5')
+snake.save_model('zoidberg.h5')

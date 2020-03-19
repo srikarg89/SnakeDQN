@@ -52,7 +52,7 @@ class AI(Snake):
 
 
     def remember(self, state, action, ate, next_state):
-        reward = -1 if next_state is None else 1 if ate else 0
+        reward = -1 if next_state is None else 1 if ate else constants.SURVIVAL_REWARD
         self.brain.add_experience([state, action, reward, next_state])
     
 
