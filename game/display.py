@@ -53,11 +53,14 @@ class Display:
         lines = [line.strip() for line in file]
         snake = Snake()
         for line in lines:
+            print(line)
             tup = literal_eval(line)
             snake.head = tup[0]
             apple = tup[-1]
             snake.body = [i for i in tup[1:-1]]
             self.draw(snake, apple)
+            self.render()
+        self.terminate()
         
 
 

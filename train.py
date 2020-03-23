@@ -1,4 +1,5 @@
 #https://towardsdatascience.com/deep-reinforcement-learning-build-a-deep-q-network-dqn-to-play-cartpole-with-tensorflow-2-and-gym-8e105744b998
+import os
 import numpy as np
 from players.ai_single import AI
 from game.env import Environment
@@ -87,10 +88,12 @@ def display_weights():
 
 
 snake = AI()
-history = "game/training/first/"
+history = "game/training/hidden50_10k/"
+if not os.path.isdir(history):
+    os.mkdir(history)
 
-for i in range(100):
-    print()
+for i in range(10000):
+#    print()
     display = NoDisplay()
     validate = False
 #    if i % 1 == -1:
@@ -99,10 +102,11 @@ for i in range(100):
 #        validate = True
     env = Environment(snake, display)
     env.run(validate)
-    env.save(history + str(i) + ".txt")
-    display_weights()
+    if i % 10 == 0:
+        env.save(history + str(i) + ".txt")
+#    display_weights()
 
 print("Final epsilon:", snake.epsilon)
 
 
-#snake.save_model('ganggang.h5')
+snake.save_model('ganggang.h5')

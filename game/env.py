@@ -101,5 +101,5 @@ class Environment:
     def save(self, filename):
         file = open(filename, "w+")
         for board in self.game_history:
-            file.write(str(board))
+            file.write(str(board) + "\n")
         file.close()

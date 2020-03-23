@@ -82,10 +82,10 @@ class AI(Snake):
         # Log stuff
         game_reward = len(self.body) + 1 - constants.SNAKE_INIT_LENGTH - 20
         self.rewards.append(game_reward)
-        display_interval = 50.0
+        display_interval = 10.0
         if len(self.rewards) >= display_interval:
             self.rewards.popleft()
-        if self.game_num % 1 == 0:
+        if self.game_num % display_interval == 0:
             print("Game: {}, Length: {}".format(self.game_num, self.running_length / display_interval))
             print("Epsilon: {}".format(self.epsilon))
             print("Loss: {}".format(self.running_loss / display_interval))
