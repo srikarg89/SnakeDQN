@@ -47,8 +47,11 @@ class Environment:
         return add(self.snake.head, self.snake.direction) == self.apple
 
 
+    def get_board(self):
+        return (self.snake.head, *self.snake.body, self.apple)
+
+
     def update(self, validate):
-#        print("Running")
         state = self.snake.get_state(self)
         action, direction = self.snake.act(state, validate)
         if direction is None:
@@ -71,16 +74,32 @@ class Environment:
             self.end_game(state, action, validate)
             return
 
+        board = self.get_board()
+        if board in self.visited:
+            self.end_game(state, action, validate)
+            return
+        self.visited.add(board)
+        self.game_history.append(board)
+
         next_state = self.snake.get_state(self)
         if not validate:
             self.snake.remember(state, action, eaten, next_state)
             self.snake.replay()
+
         self.display.draw(self.snake, self.apple)
 
 
     def run(self, validate):
         self.snake.reset()
 #        print("Beginning game")
+        self.visited = set()
+        self.game_history = []
         while not self.game_over:
             self.update(validate)
             self.display.render()
+
+    def save(self, filename):
+        file = open(filename, "w+")
+        for board in self.game_history:
+            file.write(str(board))
+        file.close()

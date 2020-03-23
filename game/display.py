@@ -1,4 +1,6 @@
 import pygame
+from ast import literal_eval
+from players.snake import Snake
 import game.constants as constants
 
 class Display:
@@ -7,6 +9,7 @@ class Display:
         self.board_width = constants.BOARD_WIDTH
         self.board_height = constants.BOARD_HEIGHT
         self.block_size = constants.BLOCK_SIZE
+        pygame.init()
         self.screen = pygame.display.set_mode((self.board_width * self.block_size, self.board_width * self.block_size))
         self.clock = pygame.time.Clock()
 
@@ -42,8 +45,20 @@ class Display:
 
     def terminate(self):
         pygame.display.quit()
-#        pygame.quit()
+        pygame.quit()
 #        print("Ended pygame")
+
+    def playback(self, filename):
+        file = open(filename, "r")
+        lines = [line.strip() for line in file]
+        snake = Snake()
+        for line in lines:
+            tup = literal_eval(line)
+            snake.head = tup[0]
+            apple = tup[-1]
+            snake.body = [i for i in tup[1:-1]]
+            self.draw(snake, apple)
+        
 
 
 

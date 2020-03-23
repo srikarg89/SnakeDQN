@@ -8,8 +8,15 @@ from players.models.basic import Model
 from players.snake import Snake
 import game.constants as constants
 from players.spaces import FPVSpace as Space
+from tensorflow.keras import backend as K
 
+#tf.debugging.set_log_device_placement(True)
+#NUM_THREADS = 4
+#sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(
+#  intra_op_parallelism_threads=NUM_THREADS))
 
+#K.set_session(sess)
+K.set_floatx('float64')
 
 class AI(Snake):
 
@@ -52,7 +59,7 @@ class AI(Snake):
 
 
     def remember(self, state, action, ate, next_state):
-        reward = -1 if next_state is None else 1 if ate else 0
+        reward = constants.DEATH_REWARD if next_state is None else constants.EAT_REWARD if ate else constants.LIFE_REWARD
         self.brain.add_experience([state, action, reward, next_state])
     
 
@@ -109,44 +116,41 @@ class Brain:
         self.experiences = deque([], maxlen=self.max_experiences)
         self.batch_size = constants.BATCH_SIZE
         self.model.compile(self.optimizer, self.loss)
-
+        self.model._experimental_run_tf_function = True
 
     def predict(self, input):
         assert(type(input) == np.ndarray)
-        return self.model.predict(input)
+        return self.model(input).numpy()
 
 
     def replay(self):
         if len(self.experiences) < self.min_experiences:
             return -100000
-        # Sample from experience
+
         batch = random.sample(self.experiences, self.batch_size)
-#        states = np.array([exp[0] for exp in batch])
-#        next_states = np.array([exp[3] if exp[3] is not None else np.zeros((self.num_inputs, )) for exp in batch])
-#        q_s_a = self.model.predict_on_batch(states)
-#        q_s_a_d = self.model.predict_on_batch(next_states)
-        # Setup training arrays
+        states = np.array([b[0] for b in batch]).reshape(self.batch_size, self.num_inputs)
+        next_states = np.array([b[3] if b[3] is not None else b[0] for b in batch]).reshape(self.batch_size, self.num_inputs)
+        current_qs = self.model(states)
+        next_qs = self.model(next_states)
+        pred_qs = []
         loss = 0
         for i, b in enumerate(batch):
             state, action, reward, next_state = b[0], b[1], b[2], b[3]
-            # get the current q values for all actions in state
-#            current_q = q_s_a[i]
-            current_q = self.predict(state)
+            current_q = current_qs[i].numpy()
+#            current_q = self.predict(state)
             # update the q value for action
             if next_state is None:
-                # in this case, the game completed after action, so there is no max Q(s',a')
-                # prediction possible
-                current_q[0][action] = reward
+                current_q[action] = reward
             else:
-#                current_q[0][action] = reward + self.gamma * np.amax(q_s_a_d[i][0])
-                next_q = self.predict(next_state)
-                current_q[0][action] = reward + self.gamma * np.amax(next_q[0])
-#            x[i] = state
-#            y[i] = current_q
-            history = self.model.fit(state, current_q, verbose=False)
-            loss += history.history['loss'][0]
+                next_q = next_qs[i].numpy()
+#                next_q = self.predict(next_state)
+                current_q[action] = reward + self.gamma * np.amax(next_q)
 
-#        loss = self.model.train_on_batch(x, y)
+            pred_qs.append(current_q)
+
+        history = self.model.fit(states, np.array(pred_qs), verbose=False)
+        loss += history.history['loss'][0]
+
         return loss / self.batch_size
 
 
