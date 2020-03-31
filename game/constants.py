@@ -32,7 +32,7 @@ DEATH_REWARD = -1
 # AI hyperparameters
 LEARNING_RATE = 1e-3
 GAMMA = 0.98
-#HIDDEN = [200, 100]
+#HIDDEN = [200, 200]
 HIDDEN = [50]
 #HIDDEN = []
 BATCH_SIZE = 32

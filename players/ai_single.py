@@ -1,3 +1,4 @@
+import time
 import random
 import datetime
 import numpy as np
@@ -16,7 +17,13 @@ from tensorflow.keras import backend as K
 #  intra_op_parallelism_threads=NUM_THREADS))
 
 #K.set_session(sess)
+tf.distribute.MirroredStrategy(
+    devices=None, cross_device_ops=None
+)
+
 K.set_floatx('float64')
+#curr_time, next_time, fit_time = 0, 0, 0
+
 
 class AI(Snake):
 
@@ -45,6 +52,8 @@ class AI(Snake):
         self.running_length = 0.0
         self.running_loss = 0.0
 
+        #self.curr_time, self.next_time, self.fit_time = 0, 0, 0
+
 
     def get_state(self, env):
         return Space.get_state(self, env)
@@ -64,12 +73,16 @@ class AI(Snake):
     
 
     def replay(self):
-        loss = self.brain.replay()
-        self.running_loss += loss
-        self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
+#        with tf.device("/GPU:0"):
+        if True:
+            loss = self.brain.replay()
+            self.running_loss += loss
+            self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
 
 
     def save_model(self, filename):
+        #print("Current time: {}, next time: {}, fit time: {}".format(self.curr_time, self.next_time, self.fit_time))
+        self.brain.terminate()
         self.brain.model.save('models/' + filename)
 
 
@@ -117,6 +130,8 @@ class Brain:
         self.batch_size = constants.BATCH_SIZE
         self.model.compile(self.optimizer, self.loss)
         self.model._experimental_run_tf_function = True
+        self.curr_time, self.next_time, self.fit_time = 0, 0, 0
+
 
     def predict(self, input):
         assert(type(input) == np.ndarray)
@@ -130,7 +145,10 @@ class Brain:
         batch = random.sample(self.experiences, self.batch_size)
         states = np.array([b[0] for b in batch]).reshape(self.batch_size, self.num_inputs)
         next_states = np.array([b[3] if b[3] is not None else b[0] for b in batch]).reshape(self.batch_size, self.num_inputs)
+        before = time.time()
         current_qs = self.model(states)
+        self.curr_time += time.time()
+        before = time.time()
         next_qs = self.model(next_states)
 #        current_qs = self.model.predict(states, use_multiprocessing=True, workers=self.batch_size)
 #        next_qs = self.model.predict(next_states, use_multiprocessing=True, workers=self.batch_size)
@@ -169,3 +187,5 @@ class Brain:
         self.experiences.append(exp)
    
 
+    def terminate(self):
+        print("Current time: {}, next time: {}, fit time: {}".format(self.curr_time, self.next_time, self.fit_time))
