@@ -1,6 +1,7 @@
 #https://towardsdatascience.com/deep-reinforcement-learning-build-a-deep-q-network-dqn-to-play-cartpole-with-tensorflow-2-and-gym-8e105744b998
 import os
 import numpy as np
+print("HIIII")
 from players.ai_single import AI
 from game.env import Environment
 from game.display import Display, NoDisplay
@@ -87,12 +88,14 @@ def display_weights():
     print("Gucciness:", a_3 - b_3 -  w_3)
 
 
+print("Creating snake")
 snake = AI()
-history = "game/training/hidden50_10k/"
+history = "game/training/multi_50-2k/"
 if not os.path.isdir(history):
     os.mkdir(history)
 
-for i in range(10000):
+print("Starting training")
+for i in range(50):
 #    print()
     display = NoDisplay()
     validate = False
@@ -109,4 +112,4 @@ for i in range(10000):
 print("Final epsilon:", snake.epsilon)
 
 
-snake.save_model('ganggang.h5')
+snake.save_model('multi.h5')

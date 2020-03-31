@@ -1,4 +1,4 @@
-import pygame
+#import pygame
 from ast import literal_eval
 from players.snake import Snake
 import game.constants as constants
