@@ -132,23 +132,29 @@ class Brain:
         next_states = np.array([b[3] if b[3] is not None else b[0] for b in batch]).reshape(self.batch_size, self.num_inputs)
         current_qs = self.model(states)
         next_qs = self.model(next_states)
+#        current_qs = self.model.predict(states, use_multiprocessing=True, workers=self.batch_size)
+#        next_qs = self.model.predict(next_states, use_multiprocessing=True, workers=self.batch_size)
         pred_qs = []
         loss = 0
         for i, b in enumerate(batch):
             state, action, reward, next_state = b[0], b[1], b[2], b[3]
             current_q = current_qs[i].numpy()
+#            current_q = current_qs[i]
 #            current_q = self.predict(state)
             # update the q value for action
             if next_state is None:
                 current_q[action] = reward
             else:
                 next_q = next_qs[i].numpy()
+#                next_q = next_qs[i]
 #                next_q = self.predict(next_state)
                 current_q[action] = reward + self.gamma * np.amax(next_q)
 
             pred_qs.append(current_q)
 
-        history = self.model.fit(states, np.array(pred_qs), verbose=False)
+        #TODO: USE MULTIPROCESSING
+        #TODO: Add callback
+        history = self.model.fit(states, np.array(pred_qs), verbose=False, use_multiprocessing=True, workers=self.batch_size)
         loss += history.history['loss'][0]
 
         return loss / self.batch_size

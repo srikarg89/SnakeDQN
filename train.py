@@ -88,7 +88,7 @@ def display_weights():
 
 
 snake = AI()
-history = "game/training/hidden50_10k/"
+history = "game/training/multi/"
 if not os.path.isdir(history):
     os.mkdir(history)
 
@@ -109,4 +109,4 @@ for i in range(10000):
 print("Final epsilon:", snake.epsilon)
 
 
-snake.save_model('ganggang.h5')
+snake.save_model('multiprocessing.h5')
