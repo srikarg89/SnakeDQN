@@ -4,3 +4,4 @@ players/__pycache__
 logs/
 .vscode/
 game/training/
+wsl_venv/

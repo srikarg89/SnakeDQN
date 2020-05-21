@@ -1,3 +1,4 @@
+import time
 import random
 import datetime
 import numpy as np
@@ -8,24 +9,39 @@ from players.models.basic import Model
 from players.snake import Snake
 import game.constants as constants
 from players.spaces import FPVSpace as Space
+from tensorflow.keras import backend as K
+
+#tf.debugging.set_log_device_placement(True)
+#NUM_THREADS = 4
+#sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(
+#  intra_op_parallelism_threads=NUM_THREADS))
+
+#K.set_session(sess)
+tf.distribute.MirroredStrategy(
+    devices=None, cross_device_ops=None
+)
+
+K.set_floatx('float64')
+#curr_time, next_time, fit_time = 0, 0, 0
+
 
 class AI(Snake):
 
-    def __init__(self):
+    def __init__(self, sess, filename=None):
         super().__init__()
         self.directions = [constants.NORTH, constants.SOUTH, constants.EAST, constants.SOUTH]
+        self.sess = sess
 
         # DQNs
         print("Creating nets")
-        self.train_brain = Brain(Space.STATE_SIZE, Space.ACTION_SIZE)
-        print("Created training net")
-        self.target_brain = Brain(Space.STATE_SIZE, Space.ACTION_SIZE)
-        print("Created target net")
+        self.actor_brain = Brain(sess, Space.STATE_SIZE, Space.ACTION_SIZE, filename)
+        self.target_brain = Brain(sess, Space.STATE_SIZE, Space.ACTION_SIZE, filename)
 
         # Hyperparameters
         self.epsilon = 1.00
         self.min_epsilon = constants.MIN_EPSILON
         self.espilon_decay = constants.EPSILON_DECAY
+        self.tau = constants.TAU
 
         # Saving
         self.counter = 0
@@ -37,56 +53,63 @@ class AI(Snake):
         log_dir = 'logs/dqn/' + current_time
         self.summary_writer = tf.summary.create_file_writer(log_dir)
         self.running_length = 0.0
+        self.running_loss = 0.0
+
+        #self.curr_time, self.next_time, self.fit_time = 0, 0, 0
 
 
     def get_state(self, env):
-        self.state = Space.get_state(self, env)
-        return self.state
+        return Space.get_state(self, env)
 
 
-    def act(self, env):
-        state = self.get_state(env)
-        self.action = Space.get_action(self, state)
-        return Space.interpret(self, self.action)
+    def act(self, state, validate):
+        if np.random.random() < self.epsilon and not validate:
+            action = np.random.choice(Space.ACTION_SIZE)
+        else:
+            action = Space.get_action(self, state)
+        return action, Space.interpret(self, action)
 
 
-    def train(self, exp):
-        self.train_brain.add_experience(exp)
-        self.train_brain.train(self.target_brain)
-        if self.counter % constants.COPY_STEP == 0:
-            self.target_brain.copy_weights(self.train_brain)
+    def remember(self, state, action, ate, next_state):
+        reward = constants.DEATH_REWARD if next_state is None else constants.EAT_REWARD if ate else constants.LIFE_REWARD
+        self.brain.add_experience([state, action, reward, next_state])
+    
+
+    def replay(self):
+#        with tf.device("/GPU:0"):
+        if True:
+            loss = self.brain.replay()
+            self.running_loss += loss
+            self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
 
 
-    def save(self, env):
-        state = np.copy(self.state)
-        action = self.action
-#        print("SAVING: ", state.shape)
-        reward = 1 if self.ate else 0
-        new_state = self.get_state(env)
-        done = False
-        self.train([state, action, reward, new_state, done])
+    def save_model(self, filename):
+        #print("Current time: {}, next time: {}, fit time: {}".format(self.curr_time, self.next_time, self.fit_time))
+        self.brain.terminate()
+        self.brain.model.save('models/' + filename)
 
 
-    def terminate(self, env):
+    def terminate(self, state, action, validate):
         self.running_length += len(self.body) + 1
-        # Save experience
-        state = np.copy(self.state)
-        action = self.action
-        reward = -20
-        next_state = self.get_state(env)
-        done = True
-        self.train([state, action, reward, next_state, done])
+        if not validate:
+            self.remember(state, action, False, None)
+            self.replay()
 
         # Log stuff
         game_reward = len(self.body) + 1 - constants.SNAKE_INIT_LENGTH - 20
         self.rewards.append(game_reward)
-        if len(self.rewards) == 50:
+        display_interval = 10.0
+        if len(self.rewards) >= display_interval:
             self.rewards.popleft()
-        if self.game_num % 50 == 0:
-            print("Game: {}, Length: {}".format(self.game_num, self.running_length / 50.0))
-            print(self.epsilon)
+        if self.game_num % display_interval == 0:
+            print("Game: {}, Length: {}".format(self.game_num, self.running_length / display_interval))
+            print("Epsilon: {}".format(self.epsilon))
+            print("Loss: {}".format(self.running_loss / display_interval))
             self.running_length = 0.0
-        self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
+            self.running_loss = 0.0
+        toprint = "Validation " if validate else ""
+        print(toprint + "Game: {}, Length: {}".format(self.game_num, len(self.body) + 1))
+#        self.epsilon = max(self.epsilon * self.espilon_decay, self.min_epsilon)
         with self.summary_writer.as_default():
             tf.summary.scalar('episode reward', game_reward, step=self.game_num)
             tf.summary.scalar('running avg reward(100)', sum(self.rewards) / len(self.rewards), step=self.game_num)
@@ -95,67 +118,86 @@ class AI(Snake):
 
 class Brain:
 
-    def __init__(self, num_inputs, num_outputs):
+    def __init__(self, sess, num_inputs, num_outputs, filename):
         # Model generation
+        self.sess = sess
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
+
+        # Hyperparameters
         self.learning_rate = constants.LEARNING_RATE
         self.gamma = constants.GAMMA
-        self.optimizer = tf.optimizers.Adam(self.learning_rate)
-        self.model = Model(num_inputs, constants.HIDDEN, num_outputs)
-        self.experiences = deque([])
+        self.batch_size = constants.BATCH_SIZE
+
+        # Store experiences
         self.max_experiences = constants.MAX_EXPERIENCES
         self.min_experiences = constants.MIN_EXPERIENCES
-        self.batch_size = constants.BATCH_SIZE
+        self.experiences = deque([], maxlen=self.max_experiences)
+
+        # Create and compile model
+        self.optimizer = tf.optimizers.Adam(self.learning_rate)
+        self.loss = tf.keras.losses.MeanSquaredError()
+        self.model = Model(num_inputs, constants.HIDDEN, num_outputs, filename)
+        self.model.compile(self.optimizer, self.loss)
+        self.model._experimental_run_tf_function = True
+
+        # Logging
+        self.curr_time, self.next_time, self.fit_time = 0, 0, 0
 
 
     def predict(self, input):
-        #FIXME: wtf it doesn't care what the input shape is? nani?
-#        print("Predicting:", input.shape)
-        return self.model(np.atleast_2d(input.astype('float32')))
+        assert(type(input) == np.ndarray)
+        return self.model(input).numpy()
 
 
-#    @tf.function
-    def train(self, target):
+    def replay(self):
         if len(self.experiences) < self.min_experiences:
-            return
-#        print("Training")
+            return -100000
 
-        idxs = np.random.randint(low=0, high=len(self.experiences), size=self.batch_size)
-        experiences = [self.experiences[i] for i in idxs]
-        temp = []
-        for i in range(5):
-            temp.append(np.asarray([exp[i] for exp in experiences]))
-        states, actions, rewards, next_states, dones = temp
-        next_values = np.max(target.predict(next_states), axis=1)
-        actual_values = np.where(dones, rewards, rewards + self.gamma*next_values)
+        batch = random.sample(self.experiences, self.batch_size)
+        states = np.array([b[0] for b in batch]).reshape(self.batch_size, self.num_inputs)
+        next_states = np.array([b[3] if b[3] is not None else b[0] for b in batch]).reshape(self.batch_size, self.num_inputs)
+        before = time.time()
+        current_qs = self.model(states)
+        self.curr_time += time.time()
+        before = time.time()
+        next_qs = self.model(next_states)
+#        current_qs = self.model.predict(states, use_multiprocessing=True, workers=self.batch_size)
+#        next_qs = self.model.predict(next_states, use_multiprocessing=True, workers=self.batch_size)
+        pred_qs = []
+        loss = 0
+        for i, b in enumerate(batch):
+            state, action, reward, next_state = b[0], b[1], b[2], b[3]
+            current_q = current_qs[i].numpy()
+#            current_q = current_qs[i]
+#            current_q = self.predict(state)
+            # update the q value for action
+            if next_state is None:
+                current_q[action] = reward
+            else:
+                next_q = next_qs[i].numpy()
+#                next_q = next_qs[i]
+#                next_q = self.predict(next_state)
+                current_q[action] = reward + self.gamma * np.amax(next_q)
 
-        with tf.GradientTape() as tape:
-            selected_action_values = tf.math.reduce_sum(
-                self.predict(states) * tf.one_hot(actions, self.num_outputs), axis=1)
-            loss = tf.math.reduce_sum(tf.square(actual_values - selected_action_values))
-            variables = self.model.trainable_variables
-            gradients = tape.gradient(loss, variables)
-            self.optimizer.apply_gradients(zip(gradients, variables))
+            pred_qs.append(current_q)
+
+        #TODO: USE MULTIPROCESSING
+        #TODO: Add callback
+        history = self.model.fit(states, np.array(pred_qs), verbose=False, use_multiprocessing=True, workers=self.batch_size)
+        loss += history.history['loss'][0]
+
+        return loss / self.batch_size
 
 
-    def get_action(self, state, epsilon):
-        if np.random.random() < epsilon:
-            return np.random.choice(self.num_outputs)
-        return np.argmax(self.predict(np.atleast_2d(state))[0])
+    def get_action(self, state):
+        pred = self.predict(state)
+        return np.argmax(pred[0])
     
 
     def add_experience(self, exp):
         self.experiences.append(exp)
-        if len(self.experiences) > self.max_experiences:
-            self.experiences.popleft()
-    
+   
 
-    def copy_weights(self, train):
-        variables1 = self.model.trainable_variables
-        variables2 = train.model.trainable_variables
-        for v1, v2 in zip(variables1, variables2):
-            v1.assign(v2.numpy())
-
-
-
+    def terminate(self):
+        print("Current time: {}, next time: {}, fit time: {}".format(self.curr_time, self.next_time, self.fit_time))
